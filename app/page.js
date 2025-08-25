@@ -1,103 +1,327 @@
-import Image from "next/image";
+"use client";
+import React, { useState, useEffect } from "react";
+import {
+  Upload,
+  Eye,
+  Trash2,
+  User,
+  Mail,
+  MessageSquare,
+  Calendar,
+  Search,
+  Filter,
+} from "lucide-react";
+import toast from "react-hot-toast";
 
-export default function Home() {
+export default function BannerPortal() {
+  const [activeTab, setActiveTab] = useState("banners");
+
+  const [contacts, setContacts] = useState([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+
+  const fetchContacts = async () => {
+    setLoadingContacts(true);
+    try {
+      const res = await fetch("/api/contacts");
+      const data = await res.json();
+      setContacts(data);
+    } catch (error) {
+      console.error("Failed to load contacts:", error);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBanners();
+    fetchContacts();
+  }, []);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [dragActive, setDragActive] = useState(false);
+  const [banners, setBanners] = useState([]);
+  const [loadingBanners, setLoadingBanners] = useState(false);
+
+  useEffect(() => {
+    fetchBanners();
+  }, []);
+
+  const fetchBanners = async () => {
+    setLoadingBanners(true);
+    try {
+      const res = await fetch("/api/banners");
+      const data = await res.json();
+      setBanners(data);
+    } catch (error) {
+      console.error("Failed to load banners:", error);
+    } finally {
+      setLoadingBanners(false);
+    }
+  };
+
+  const handleFileUpload = async (files) => {
+    Array.from(files).forEach((file) => {
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const fileBase64 = e.target.result;
+          const newBanner = {
+            name: file.name,
+            fileBase64,
+            uploadDate: new Date().toISOString().split("T")[0],
+            size: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+          };
+
+          toast.promise(
+            fetch("/api/banners", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(newBanner),
+            }).then(async (res) => {
+              if (!res.ok) throw new Error("Upload failed");
+              const saved = await res.json();
+              setBanners((prev) => [saved, ...prev]);
+            }),
+            {
+              loading: "Uploading...",
+              success: "Banner uploaded!",
+              error: "Upload failed",
+            }
+          );
+        };
+        reader.readAsDataURL(file);
+      } else {
+        toast.error("Only image files are allowed!");
+      }
+    });
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files);
+    }
+  };
+
+  const deleteBanner = async (id) => {
+    toast.promise(
+      fetch(`/api/banners/${id}`, { method: "DELETE" }).then((res) => {
+        if (!res.ok) throw new Error("Delete failed");
+        setBanners((prev) => prev.filter((b) => b._id !== id));
+      }),
+      {
+        loading: "Deleting...",
+        success: "Banner deleted!",
+        error: "Delete failed",
+      }
+    );
+  };
+  const filteredContacts = contacts.filter((contact) => {
+    const search = searchTerm.toLowerCase();
+    return (
+      contact.name.toLowerCase().includes(search) ||
+      contact.email.toLowerCase().includes(search) ||
+      contact.message.toLowerCase().includes(search) ||
+      contact.service.toLowerCase().includes(search) || 
+      contact.country.toLowerCase().includes(search) 
+    );
+  });
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <h1 className="text-3xl font-bold text-gray-900">Admin Portal</h1>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setActiveTab("banners")}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  activeTab === "banners"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                <Upload className="w-4 h-4 inline mr-2" />
+                Banner Manager
+              </button>
+              <button
+                onClick={() => setActiveTab("contacts")}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  activeTab === "contacts"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 inline mr-2" />
+                Contact Responses
+              </button>
+            </div>
+          </div>
         </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === "banners" && (
+          <div className="space-y-8">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold mb-4">Upload New Banner</h2>
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  dragActive ? "border-blue-400 bg-blue-50" : "border-gray-300"
+                }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
+                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-lg text-gray-600 mb-2">
+                  Drag and drop your banner images here
+                </p>
+                <p className="text-sm text-gray-500 mb-4">or</p>
+                <label className="bg-blue-600 text-white px-6 py-2 rounded-lg cursor-pointer hover:bg-blue-700 transition-colors">
+                  Browse Files
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                  />
+                </label>
+                <p className="text-xs text-gray-500 mt-4">
+                  Supports: JPG, PNG, GIF, WebP (Max 10MB each)
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold mb-6">Current Banners</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {banners.map((banner) => (
+                  <div
+                    key={banner._id}
+                    className="border rounded-lg overflow-hidden"
+                  >
+                    <img
+                      src={banner.url}
+                      alt={banner.name}
+                      className="w-full h-48 object-cover"
+                    />
+                    <div className="p-4">
+                      <h3 className="font-medium text-gray-900 mb-2">
+                        {banner.name}
+                      </h3>
+                      <div className="text-sm text-gray-500 space-y-1">
+                        <p className="flex items-center">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          {banner.uploadDate}
+                        </p>
+                        <p>Size: {banner.size}</p>
+                      </div>
+                      <div className="flex justify-between mt-4">
+                        <button
+                          onClick={() => deleteBanner(banner._id)}
+                          className="text-red-600 hover:text-red-800 flex items-center"
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "contacts" && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search contacts..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-xl font-semibold">
+                  Contact Form Responses
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {filteredContacts.length} of {contacts.length} contacts
+                </p>
+              </div>
+              <div className="divide-y divide-gray-200">
+                {filteredContacts.map((contact) => (
+                  <div
+                    key={contact._id}
+                    className="p-6 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-start space-x-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <User className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900">
+                            {contact.name}
+                          </h3>
+                          <p className="text-sm text-gray-500 flex items-center">
+                            <Mail className="w-4 h-4 mr-1" />
+                            {contact.email}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Phone: {contact.phone}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Service: {contact.service}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Country: {contact.country}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className="text-sm text-gray-500">
+                          {new Date(contact.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-gray-700 mb-4">{contact.message}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
